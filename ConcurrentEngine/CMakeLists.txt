@@ -21,8 +21,7 @@ function(add_example name)
     target_link_libraries(${name} PRIVATE ConcurrentEngineLib)
 endfunction()
 
-# 單檔案範例
-# add_example(main)
+# add_example
 add_example(dag_test)
 add_example(future_return)
 add_example(reject_block)
