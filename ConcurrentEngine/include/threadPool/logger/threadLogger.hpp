@@ -25,12 +25,13 @@ enum class LogLevel
     DEBUG
 };
 
-class ThreadLogger 
+class ThreadLogger //default: getInstance().enableConsoleLogging(true)
 {
 public:
     static ThreadLogger& getInstance();
 
     void log(const std::string& message, LogLevel level = LogLevel::INFO, int threadID = -1);
+    void enableConsoleLogging(bool enable) { logToConsole_ = enable; }
 
     void enableFileLogging(const std::string& filename = "thread.log");
     void disableFileLogging();
@@ -44,6 +45,7 @@ private:
     ThreadLogger(const ThreadLogger&) = delete;
     ThreadLogger& operator=(const ThreadLogger&) = delete;
 
+    bool logToConsole_ = true;
     std::mutex logMutex_;
     bool logToFile_ = false;
     std::ofstream logFile_;

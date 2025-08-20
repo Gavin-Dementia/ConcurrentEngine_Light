@@ -54,7 +54,7 @@ void FIFOScheduler::addTask(Task task)
     }
 
     taskQueue_.push(std::move(task));
-    std::cout << "[FIFOScheduler] Task pushed\n";
+    // std::cout << "[FIFOScheduler] Task pushed\n";
 
     lock.unlock();
     cv_.notify_one();

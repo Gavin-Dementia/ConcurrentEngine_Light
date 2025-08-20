@@ -45,8 +45,8 @@ void PriorityScheduler::addTask(Task task, TaskPriority priority)
 
     queues_[priority].push(std::move(task));
     ++currentTaskCount_;
-    std::cout << "[PriorityScheduler] Task pushed to priority "
-              << static_cast<int>(priority) << "\n";
+    // std::cout << "[PriorityScheduler] Task pushed to priority "
+    //           << static_cast<int>(priority) << "\n";
 
     lock.unlock();
     cv_.notify_one();

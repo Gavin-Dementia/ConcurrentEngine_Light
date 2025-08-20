@@ -12,6 +12,8 @@ ThreadLogger& ThreadLogger::getInstance()
 
 void ThreadLogger::log(const std::string& message, LogLevel level, int threadID) 
 {
+    if (!logToConsole_) return;
+
     static thread_local bool reentry = false;
     if (reentry) return;  // 防止遞迴 log 導致 terminate
     reentry = true;

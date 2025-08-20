@@ -265,13 +265,12 @@ int main()
 
 #endif
 
+#if 1
 #include <threadPool/threadPool.hpp>
 #include <threadPool/scheduler/PriorityScheduler.hpp>
 #include <threadPool/scheduler/DAGschedule.hpp>
 #include <threadPool/scheduler/FIFO_schedule.hpp>
 #include <iostream>
-#include <iostream>
-#include "threadPool/threadPool.hpp"
 #include "RedisServer.hpp"
 
 int main() 
@@ -298,5 +297,5 @@ int main()
         std::cerr << "Fatal: " << ex.what() << std::endl;
     }
 }
-
+#endif
 
