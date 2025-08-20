@@ -13,7 +13,6 @@
 
 using namespace std;
 
-// 简单随机字符串生成
 string random_string(size_t length) 
 {
     static const char charset[] =
@@ -43,7 +42,7 @@ void stress_test(ConcurrentEngine::ThreadPool& pool, std::string schedulerName, 
             string key = "key_" + to_string(i % 1000);  
             string value = random_string(16);
 
-            // if (i < 5) { // 只打印前5个任务
+            // if (i < 5) {
             //     if (i % 3 == 0) {
             //         std::cout << "[Task " << i << "] SET " << key << " = " << value << std::endl;
             //     } else if (i % 3 == 1) {
@@ -53,12 +52,10 @@ void stress_test(ConcurrentEngine::ThreadPool& pool, std::string schedulerName, 
             //     }
             // }
 
-            // 模拟耗时
             this_thread::sleep_for(1ms);
         }));
     }
 
-    // 等待所有任务完成
     for (auto& r : results) 
         r.get();
     
@@ -95,7 +92,6 @@ int main()
 
 
 #endif
-
 
 #if 0    // auto stress_test 
 #include <iostream>
@@ -187,7 +183,6 @@ int main()
 
 #endif
 
-
 #if 0 // auto stress_test v2
 
 #include <vector>
@@ -213,7 +208,6 @@ struct StressResult {
     int completed;
 };
 
-// 改良版 stress_test
 StressResult stress_test_auto(ConcurrentEngine::ThreadPool& pool, int num_tasks) 
 {
     atomic<int> counter = 0;
@@ -309,8 +303,8 @@ int main()
 #endif 
 
 #if 1 // auto stress_test v3
-// stress_test.cpp (改良版)
-// 作用：每個 scheduler 使用獨立 ThreadPool，完成 CSV 輸出後用 PowerShell 執行 Python 分析腳本
+// goal: each scheduler use ThreadPool independently
+//       after CSV output use PowerShell to run Python analysis script
 #include <vector>
 #include <chrono>
 #include <thread>
@@ -327,7 +321,6 @@ int main()
 #include <threadPool/scheduler/PriorityScheduler.hpp>
 
 using namespace std;
-
 struct StressResult 
 {
     int tasks;
@@ -337,7 +330,6 @@ struct StressResult
     int completed;
 };
 
-// 改良版 stress_test：submit 之後會等待所有 futures 完成再回傳
 StressResult stress_test_auto(ConcurrentEngine::ThreadPool& pool, int num_tasks) 
 {
     std::atomic<int> counter{0};
@@ -350,11 +342,10 @@ StressResult stress_test_auto(ConcurrentEngine::ThreadPool& pool, int num_tasks)
     {
         results.push_back(pool.submit("redis_task", [&counter]() {
             try {
-                // 模擬短暫工作
-                std::this_thread::sleep_for(1ms);
+                std::this_thread::sleep_for(1ms);// working 1ms each task
                 counter.fetch_add(1, std::memory_order_relaxed);
             } catch (...) {
-                // task 內部例外會在 future.get() 拋出
+                // task internal exception will be thrown in future.get()
                 throw;
             }
         }));
@@ -362,12 +353,12 @@ StressResult stress_test_auto(ConcurrentEngine::ThreadPool& pool, int num_tasks)
 
     auto end_submit = std::chrono::high_resolution_clock::now();
 
-    // 等待所有 futures 完成
+    // wait for futures to complete
     for (auto &f : results) 
     {
         if (!f.valid()) continue;
         try {
-            f.get(); // 若 task 拋出例外，會在這裡捕捉
+            f.get(); // if task throws exception, it will be caught here
         } catch (const std::exception &e) {
             std::cerr << "[Task Exception] " << e.what() << std::endl;
         } catch (...) {
@@ -398,8 +389,6 @@ int main()
         }
         csvFile << "Scheduler,Tasks,Submit_ms,Exec_ms,Total_ms,Completed\n";
 
-       
-        // 兩種 scheduler 各自使用一個新的 ThreadPool 實例（避免切換 scheduler 時的 race）
         for (auto scheduler_type : {"FIFO", "PRIORITY"}) 
         {
             cout << "\n=== Testing " << scheduler_type << " Scheduler ===\n";
@@ -412,7 +401,7 @@ int main()
             for (auto num_tasks : task_sizes) 
             {
                 try {
-                    // 為每個測試建立新的 ThreadPool，確保狀態乾淨
+                    // new ThreadPool for each test
                     ConcurrentEngine::ThreadPool pool;
                     ThreadLogger::getInstance().enableConsoleLogging(false);
                     pool.setMode(ConcurrentEngine::PoolMode::MODE_CACHED);
@@ -424,8 +413,8 @@ int main()
 
                     pool.start(8);
                     auto result = stress_test_auto(pool, num_tasks);
-                    pool.stop();// stop pool 在所有 future 已完成之後呼叫
-                    
+                    pool.stop();// stop pool after all futures have completed
+
                     cout << setw(12) << result.tasks
                          << setw(12) << result.submit_ms
                          << setw(12) << result.exec_ms
