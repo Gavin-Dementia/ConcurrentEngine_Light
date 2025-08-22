@@ -265,7 +265,7 @@ int main()
 
 #endif
 
-#if 1
+#if 0
 #include <threadPool/threadPool.hpp>
 #include <threadPool/scheduler/PriorityScheduler.hpp>
 #include <threadPool/scheduler/DAGschedule.hpp>
@@ -298,4 +298,48 @@ int main()
     }
 }
 #endif
+
+
+#if 1
+
+#include <iostream>
+#include <threadPool/threadPool.hpp> 
+#include <threadPool/logger/threadLogger.hpp>
+#include "RedisServer.hpp"
+#include "CommandParser.hpp"
+
+
+int main() 
+{
+    ConcurrentEngine::ThreadPool pool;
+    ThreadLogger::getInstance().enableConsoleLogging(false);
+
+    // Set up FIFO scheduler
+    pool.setScheduler(std::make_unique<ConcurrentEngine::Scheduler::FIFOScheduler>());
+    pool.start(4); // Start with 4 threads
+
+    RedisServer server(pool);
+    CommandParser parser;
+
+    std::string line;
+    while(true) 
+    {
+        std::cout << "mini-Redis> ";
+        std::getline(std::cin, line);
+        Command cmd = parser.parse(line);
+
+        auto result_future = server.submitCommand(cmd);
+        std::string result = result_future.get();
+        std::cout << result << std::endl;
+
+        if(cmd.type == CommandType::QUIT) break;
+    }
+
+    return 0;
+}
+
+
+#endif 
+
+
 

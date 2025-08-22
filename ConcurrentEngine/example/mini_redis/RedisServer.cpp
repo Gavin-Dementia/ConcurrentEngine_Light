@@ -1,98 +1,22 @@
 #include "RedisServer.hpp"
-#include <iostream>
 
-void RedisServerConcurrent::run()
-{
-    std::string line;
-    std::cout << "mini-Redis CLI (type QUIT to exit)\n";
+RedisServer::RedisServer(ConcurrentEngine::ThreadPool& pool) 
+        : pool_(pool) 
+    {}
 
-    // Vector to hold pending futures
-    std::vector<std::future<std::string>> pending;
-
-    while (true)
-    {
-        std::cout << "> ";
-        std::getline(std::cin, line);
-
-        Command cmd = parser_.parse(line);
-
-        if (cmd.type == CommandType::QUIT)
-            break;
-
-        // Submit command using templated submit(), returns std::future<std::string>
-        auto fut = pool_.submit("redis_task", [this, cmd]() {
-            return executor_.executeType(cmd);
-        });
-
-
-        pending.push_back(std::move(fut));
-    }
-
-    // Print all results after commands are submitted
-    for (auto& fut : pending)
-        std::cout << fut.get() << std::endl;
-
-    std::cout << "Goodbye!\n";
+std::future<std::string> RedisServer::submitCommand(const Command& cmd) {
+    return pool_.submit("task", [this, cmd]() -> std::string {
+        switch(cmd.type) 
+        {
+            case CommandType::GET: return db_.get(cmd.key);
+            case CommandType::SET: return db_.set(cmd.key, cmd.value);
+            case CommandType::DEL: return db_.del(cmd.key);
+            case CommandType::EXISTS: return db_.exists(cmd.key);
+            case CommandType::PING: return "PONG";
+            case CommandType::QUIT: return "QUIT";
+            case CommandType::HELP: return "Commands: GET, SET, DEL, EXISTS, PING, QUIT, HELP";
+            default: return "ERR unknown command";
+        }
+    });
 }
 
-
-
-
-// void RedisServerConcurrent::run()
-// {
-//         std::string line;
-//         std::cout << "mini-Redis CLI (type QUIT to exit)\n";
-
-//         while (true)
-//         {
-//             std::cout << "> ";
-//             std::getline(std::cin, line);
-
-//             Command cmd = parser_.parse(line);
-
-//             if (cmd.type == CommandType::QUIT)
-//                 break;
-
-//             // Submit command to ThreadPool
-//             auto fut = pool_.submit([this, cmd]() {
-//                 return executor_.executeType(cmd);
-//             });
-
-//             // Wait for result and print
-//             std::cout << fut.get() << std::endl;
-//             // std::vector<std::future<std::string>> pending;
-//             // pending.push_back(pool_.submit([this, cmd]() {
-//             //     return executor_.executeType(cmd);
-//             // }));
-
-//             // // Later: print all results
-//             // for(auto &fut : pending)
-//             //     std::cout << fut.get() << std::endl;
-//             // pending.clear();
-
-//         }
-
-//         std::cout << "Goodbye!\n";
-// }
-
-// void RedisServer::run()
-// {
-//     std::string line;
-//     std::cout << "mini-Redis CLI (type QUIT to exit)\n";
-
-//     while (true)
-//     {
-//         std::cout << "> ";
-//         std::getline(std::cin, line);
-
-//         Command cmd = parser_.parse(line);
-
-//         if (cmd.type == CommandType::QUIT)
-//             break;
-
-//         std::string result = executor_.executeType(cmd);
-//         std::cout << result << std::endl;
-//     }
-
-//     std::cout << "Goodbye!\n";
-// }

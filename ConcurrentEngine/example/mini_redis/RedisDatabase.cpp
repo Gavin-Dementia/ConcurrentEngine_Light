@@ -1,27 +1,28 @@
 #include "RedisDatabase.hpp"
 
-bool RedisDatabase::set(const std::string& key, const std::string& value) 
+std::string RedisDatabase::get(const std::string& key) 
 {
     std::lock_guard<std::mutex> lock(mutex_);
-    data_[key] = value;
-
-    return true;
+    auto it = store_.find(key);
+    return it != store_.end() ? it->second : "(nil)";
 }
 
-std::optional<std::string> RedisDatabase::get(const std::string& key) 
+std::string RedisDatabase::set(const std::string& key, const std::string& value) 
 {
     std::lock_guard<std::mutex> lock(mutex_);
-    auto it = data_.find(key);
-    if (it != data_.end()) 
-        return it->second;
-
-    return std::nullopt;
+    store_[key] = value;
+    return "OK";
 }
 
-bool RedisDatabase::del(const std::string& key) 
+std::string RedisDatabase::del(const std::string& key) 
 {
     std::lock_guard<std::mutex> lock(mutex_);
+    return store_.erase(key) > 0 ? "1" : "0";
+}
 
-    return data_.erase(key) > 0;
+std::string RedisDatabase::exists(const std::string& key) 
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    return store_.count(key) > 0 ? "1" : "0";
 }
 

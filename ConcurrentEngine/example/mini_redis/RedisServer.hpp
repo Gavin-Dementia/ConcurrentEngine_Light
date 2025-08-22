@@ -1,53 +1,21 @@
 #ifndef REDISSERVER_HPP
 #define REDISSERVER_HPP
 
-#if 0
-#include "CommandParser.hpp"
-#include "CommandExecutor.hpp"
-#include <string>
-
-class RedisServer
-{
-public:
-    RedisServer();
-    void run();  // main loop
-
-private:
-    RedisDatabase db_;
-    CommandParser parser_;
-    CommandExecutor executor_;
-};
-
-#endif 
-
-#if 1
-#include "CommandParser.hpp"
-#include "CommandExecutor.hpp"
-#include <threadPool/threadPool.hpp> 
-
-#include <iostream>
 #include <future>
-#include <vector>
+#include <threadPool/threadPool.hpp> 
+#include "RedisDatabase.hpp"
+#include "CommandParser.hpp"
 
-class RedisServerConcurrent
+class RedisServer 
 {
 public:
-    RedisServerConcurrent(ConcurrentEngine::ThreadPool& pool)
-        : executor_(db_)
-        , pool_(pool)
-    {}
-
-    void run();
+    RedisServer(ConcurrentEngine::ThreadPool& pool);
+    std::future<std::string> submitCommand(const Command& cmd);
 
 private:
     RedisDatabase db_;
-    CommandParser parser_;
-    CommandExecutor executor_;
     ConcurrentEngine::ThreadPool& pool_;
 };
-
-
-#endif
 
 #endif // REDISSERVER_HPP
 

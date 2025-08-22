@@ -1,22 +1,22 @@
 #ifndef REDIS_DATABASE_HPP
 #define REDIS_DATABASE_HPP
 
-#include <string>
 #include <unordered_map>
+#include <string>
 #include <mutex>
-#include <optional>
 
-class RedisDatabase 
-{
+class RedisDatabase {
 public:
-    bool set(const std::string& key, const std::string& value);
-    std::optional<std::string> get(const std::string& key);
-    bool del(const std::string& key);
+    std::string get(const std::string& key);
+    std::string set(const std::string& key, const std::string& value);
+    std::string del(const std::string& key);
+    std::string exists(const std::string& key);
 
 private:
-    std::unordered_map<std::string, std::string> data_;
+    std::unordered_map<std::string, std::string> store_;
     std::mutex mutex_;
 };
+
 
 #endif // REDIS_DATABASE_HPP
 
