@@ -41,7 +41,7 @@ struct ThreadPoolState
     std::condition_variable notNull;
 };
 
-class ThreadPool 
+class ThreadPool //default:: ThreadLogger::getInstance().enableConsoleLogging(true)
 {
 public:
     explicit ThreadPool(std::unique_ptr<Scheduler::IScheduler> scheduler = nullptr)
