@@ -300,7 +300,7 @@ int main()
 #endif
 
 
-#if 1
+#if 0
 
 #include <iostream>
 #include <threadPool/threadPool.hpp> 
@@ -340,6 +340,384 @@ int main()
 
 
 #endif 
+
+
+#if 0
+
+#include <iostream>
+#include <vector>
+#include <thread>
+#include <random>
+#include <chrono>
+
+#include <threadPool/threadPool.hpp> 
+#include <threadPool/logger/threadLogger.hpp>
+
+#include "RedisServer.hpp"
+#include "CommandParser.hpp"
+#include "CommandExecutor.hpp"
+
+
+Command randomCommand(int i) 
+{
+    static std::mt19937 rng(std::random_device{}());
+    static std::uniform_int_distribution<int> dist(0,3); // 0=SET,1=GET,2=DEL,3=EXISTS
+    int cmd_type = dist(rng);
+    std::string key = "key" + std::to_string(i);
+    std::string value = "value" + std::to_string(i);
+
+    switch(cmd_type) 
+    {
+        case 0: return {CommandType::SET, key, value};
+        case 1: return {CommandType::GET, key, ""};
+        case 2: return {CommandType::DEL, key, ""};
+        case 3: return {CommandType::EXISTS, key, ""};
+    }
+    return {CommandType::INVALID, "", ""};
+}
+
+int main() 
+{
+    ConcurrentEngine::ThreadPool pool;
+    ThreadLogger::getInstance().enableConsoleLogging(false);
+
+    pool.setScheduler(std::make_unique<ConcurrentEngine::Scheduler::FIFOScheduler>());
+    pool.start(16);
+
+    RedisServer server(pool);
+    CommandExecutor executor(server);
+
+    const int N = 1000;            // 壓力測試命令數
+    const int num_threads = 4;     // 模擬多線程 CLI 提交
+    std::vector<std::thread> threads;
+    std::vector<std::future<std::string>> results;
+    results.reserve(N);
+
+    auto start_time = std::chrono::steady_clock::now();
+
+    for(int t=0; t<num_threads; t++) {
+        threads.emplace_back([&]() {
+            for(int i=t; i<N; i+=num_threads) 
+            {
+                Command cmd = randomCommand(i);
+                auto fut = executor.executeCommand(cmd);
+                // 加入結果保護
+                {
+                    static std::mutex mtx;
+                    std::lock_guard<std::mutex> lock(mtx);
+                    results.push_back(std::move(fut));
+                }
+            }
+        });
+    }
+
+    for(auto &th : threads) th.join();
+
+    // 等待所有結果並簡單檢查 SET/GET
+    int success = 0;
+    for(int i=0;i<results.size();i++)
+    {
+        std::string res = results[i].get();
+        if(res != "ERR unknown command" && !res.empty()) success++;
+    }
+
+    auto end_time = std::chrono::steady_clock::now();
+    auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+
+    std::cout << "Total commands: " << results.size() << std::endl;
+    std::cout << "Successful results: " << success << std::endl;
+    std::cout << "Total time: " << duration_ms << " ms" << std::endl;
+
+    return 0;
+}
+
+
+
+#endif 
+
+
+#if 0
+#include <iostream>
+#include <threadPool/threadPool.hpp>
+#include "RedisServer.hpp"
+
+int main()
+{
+    try {
+        // 1. 创建 ThreadPool
+        ConcurrentEngine::ThreadPool pool;
+        ThreadLogger::getInstance().enableConsoleLogging(false);
+        pool.setScheduler(std::make_unique<ConcurrentEngine::Scheduler::FIFOScheduler>());
+        pool.start(4); // 4 个 worker 线程
+
+        // 2. 创建 mini-Redis 实例
+        RedisServer redis(pool);
+
+        // 3. 测试命令数组
+        std::vector<std::string> commands = {
+            "SET key1 hello world",
+            "SET key2 123 456",
+            "GET key1",
+            "GET key2",
+            "EXISTS key1 key2 key3",
+            "DEL key1 key3",
+            "GET key1",
+            "PING",
+            "HELP",
+            "QUIT"
+        };
+
+        CommandParser parser;
+
+        for (auto& line : commands) 
+        {
+            std::cout << "> " << line << std::endl;
+
+            // 解析命令
+            Command cmd = parser.parse(line);
+
+            // QUIT 直接退出
+            if (cmd.type == CommandType::QUIT)
+            {
+                std::cout << "Goodbye.. \n";
+                break;
+            }
+
+            auto fut = redis.submitCommand(cmd);// 提交命令到线程池
+            std::cout << fut.get() << std::endl;// 立即打印结果
+        }
+
+        pool.stop();
+
+    } catch (const std::exception& ex) {
+        std::cerr << "Fatal error: " << ex.what() << std::endl;
+    }
+
+    return 0;
+}
+#endif
+
+
+#if 0 //light_way stress test
+#include <iostream>
+#include <vector>
+#include <string>
+#include <chrono>
+#include <sstream>
+#include <threadPool/threadPool.hpp>
+#include "RedisServer.hpp"
+#include "CommandParser.hpp"
+
+// Helper to measure time
+using Clock = std::chrono::high_resolution_clock;
+
+int main() {
+    try {
+        // 1. 创建 ThreadPool
+        ConcurrentEngine::ThreadPool pool;
+        ThreadLogger::getInstance().enableConsoleLogging(false);
+        
+        // 可切换不同调度器: FIFO / Priority / DAG
+        pool.setScheduler(std::make_unique<ConcurrentEngine::Scheduler::FIFOScheduler>());
+        // pool.setScheduler(std::make_unique<ConcurrentEngine::Scheduler::PriorityScheduler>());
+        // pool.setScheduler(std::make_unique<ConcurrentEngine::Scheduler::DAGScheduler>());
+
+        pool.start(4); // 4 worker 线程
+
+        // 2. 创建 mini-Redis
+        RedisServer redis(pool);
+        CommandParser parser;
+
+        // 3. 测试命令集合
+        std::vector<std::string> commands = {
+            "SET key1 hello world",
+            "SET key2 123 456",
+            "SET key3 foo bar baz",
+            "GET key1",
+            "GET key2",
+            "GET key3",
+            "EXISTS key1 key2 key4",
+            "DEL key1 key4",
+            "PING",
+            "HELP"
+        };
+
+        std::vector<std::future<std::string>> results;
+        results.reserve(commands.size());
+
+        // 4. 提交命令并记录时间
+        std::cout << "=== Submitting commands ===\n";
+        for (auto& line : commands) {
+            Command cmd = parser.parse(line);
+            auto start = Clock::now();
+
+            auto fut = redis.submitCommand(cmd);
+
+            // 包装 future 打印延迟
+            results.push_back(std::async(std::launch::async, [fut = std::move(fut), line, start]() mutable {
+                auto res = fut.get();
+                auto end = Clock::now();
+                auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+                std::ostringstream oss;
+                oss << "> " << line << " => " << res << "  [" << ms << " ms]";
+                return oss.str();
+            }));
+        }
+
+        // 5. 打印结果
+        for (auto& fut : results) {
+            std::cout << fut.get() << std::endl;
+        }
+
+        // 6. 停止线程池
+        pool.stop();
+
+        std::cout << "=== Test finished ===\n";
+
+    } catch (const std::exception& ex) {
+        std::cerr << "Fatal error: " << ex.what() << std::endl;
+    }
+
+    return 0;
+}
+
+#endif
+
+#if 1 // with switching schedulers without DAG 
+#include <iostream>
+#include <vector>
+#include <string>
+#include <sstream>
+#include <chrono>
+#include <threadPool/threadPool.hpp>
+#include "RedisServer.hpp"
+#include "CommandParser.hpp"
+
+using Clock = std::chrono::high_resolution_clock;
+
+struct CommandStat {
+    std::string commandLine;
+    long long durationMs;
+    std::string result;
+};
+
+int main() {
+    try {
+        // 命令批量
+        std::vector<std::string> commands = {
+            "SET key1 hello world",
+            "SET key2 123 456",
+            "SET key3 foo bar baz",
+            "GET key1",
+            "GET key2",
+            "GET key3",
+            "EXISTS key1 key2 key4",
+            "DEL key1 key4",
+            "PING",
+            "HELP"
+        };
+
+        // 调度策略列表
+        std::vector<std::pair<std::string, std::function<std::unique_ptr<ConcurrentEngine::Scheduler::IScheduler>()>>> schedulers = {
+            {"FIFO", [](){ return std::make_unique<ConcurrentEngine::Scheduler::FIFOScheduler>(); }},
+            {"Priority", [](){ return std::make_unique<ConcurrentEngine::Scheduler::PriorityScheduler>(); }}
+        };
+
+
+        for (auto& [name, factory] : schedulers) 
+        {
+            std::cout << "=== Testing Scheduler: " << name << " ===\n";
+
+            ConcurrentEngine::ThreadPool pool;
+            ThreadLogger::getInstance().enableConsoleLogging(false);
+            pool.setScheduler(factory());
+            pool.start(4);
+
+            RedisServer redis(pool);
+            CommandParser parser;
+            std::vector<CommandStat> stats;
+
+            for (auto& line : commands) {
+                Command cmd = parser.parse(line);
+                auto start = Clock::now();
+
+                auto fut = redis.submitCommand(cmd);
+                std::string result = fut.get();  // 同步获取结果
+
+                auto end = Clock::now();
+                long long duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+                stats.push_back({line, duration, result});
+            }
+
+            // 打印结果表格
+            long long total = 0, maxMs = 0;
+            std::cout << "Command results:\n";
+            for (auto& s : stats) 
+            {
+                std::cout << "> " << s.commandLine << " => " << s.result 
+                          << " [" << s.durationMs << " ms]\n";
+                total += s.durationMs;
+                if (s.durationMs > maxMs) maxMs = s.durationMs;
+            }
+            std::cout << "Average latency: " << (total / stats.size()) << " ms, "
+                      << "Max latency: " << maxMs << " ms\n\n";
+
+            pool.stop();
+        }
+
+        std::cout << "=== All schedulers tested ===\n";
+
+    } catch (const std::exception& ex) {
+        std::cerr << "Fatal error: " << ex.what() << std::endl;
+    }
+
+    return 0;
+}
+
+#endif
+
+#if 0 // DAG minimal example
+#include <iostream>
+#include <threadPool/threadPool.hpp>
+#include <threadPool/scheduler/DAGschedule.hpp>
+#include <memory>
+#include <chrono>
+#include <thread>
+
+#include "RedisServer.hpp"
+#include "CommandParser.hpp"
+
+
+int main() {
+    auto dagScheduler = std::make_unique<ConcurrentEngine::Scheduler::DAGScheduler>();
+    ConcurrentEngine::ThreadPool pool(std::move(dagScheduler));
+    pool.start(4);
+
+    RedisServer redis(pool);
+
+    Command setA{CommandType::SET, "key1", "hello"};
+    Command setB{CommandType::SET, "key2", "world"};
+    Command getA{CommandType::GET, "key1"};
+
+    auto nodeA = redis.submitCommandDAG(setA); 
+    auto nodeB = redis.submitCommandDAG(setB);
+    auto nodeC = redis.submitCommandDAG(getA, {nodeA, nodeB}); // DAG依賴
+
+    auto fut = redis.getResult(nodeC); // 外部才等待結果
+    std::cout << "GET result = " << fut.get() << "\n";
+
+    pool.stop();
+}
+
+
+#endif
+
+
+
+
+
+
 
 
 

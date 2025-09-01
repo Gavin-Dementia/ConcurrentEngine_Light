@@ -34,7 +34,9 @@ Task DAGScheduler::getTask()
     std::unique_lock<std::mutex> lock(mutex_);
     cv_.wait(lock, [this] { return !readyQueue_.empty() || !running_; });
 
-    if (!running_ && readyQueue_.empty())  return {};
+    // if (!running_ && readyQueue_.empty())  return {};
+    if (!running_ && readyQueue_.empty())  return nullptr;
+
     
     auto node = readyQueue_.front();
     readyQueue_.pop();
@@ -42,7 +44,8 @@ Task DAGScheduler::getTask()
     if (!node || !node->task)
     {
         LOG_ERROR("[DAGScheduler] ERROR: null or empty task node in getTask()");
-        return {};
+        return nullptr;
+        // return {};
     }
 
     // 回傳一個包裝任務：執行實際任務後通知完成

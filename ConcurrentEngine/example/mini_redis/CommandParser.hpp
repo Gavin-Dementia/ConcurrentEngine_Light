@@ -6,7 +6,8 @@
 enum class CommandType { GET, SET, DEL, EXISTS, PING, QUIT, HELP, INVALID };
 struct Command { CommandType type; std::string key, value; };
 
-class CommandParser {
+class CommandParser 
+{
 public:
     Command parse(const std::string& line);
 };

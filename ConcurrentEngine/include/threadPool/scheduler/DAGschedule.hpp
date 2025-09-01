@@ -19,7 +19,7 @@ using Task = std::function<void()>;
 // 單一任務節點，包含依賴計數及依賴節點列表（弱指標避免循環引用）
 struct TaskNode 
 {
-    explicit TaskNode(Task t) : task(std::move(t)) {}
+    explicit TaskNode(Task t = nullptr) : task(std::move(t)) {}
     Task task;
     int dependencyCount = 0;
     std::vector<std::weak_ptr<TaskNode>> dependents;
