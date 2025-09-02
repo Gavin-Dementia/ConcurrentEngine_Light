@@ -123,14 +123,14 @@ Task C
 ```bash
 | Module                | Description                              |
 | --------------------- | ---------------------------------------- |
-| **ThreadPool**        | Manages worker threads & task submission |
-| **Scheduler**         | Abstract interface for task dispatching  |
-| **FIFOScheduler**     | Queue-based scheduler (default)          |
-| **PriorityScheduler** | Priority queue scheduler                 |
-| **DAGScheduler**      | Dependency-aware task execution          |
-| **Logger**            | Thread-safe logging with timestamps      |
+|   ThreadPool          | Manages worker threads & task submission |
+|   Scheduler           | Abstract interface for task dispatching  |
+|   FIFOScheduler       | Queue-based scheduler (default)          |
+|   PriorityScheduler   | Priority queue scheduler                 |
+|   DAGScheduler        | Dependency-aware task execution          |
+|   Logger              | Thread-safe logging with timestamps      |
 ```
-## Example: Mini-Redis
+## Example: Mini-Redis （ : progressing）
 This repo includes a concurrent mini-Redis implementation in examples/mini_redis/,
 powered by the ThreadPool + schedulers.
 ### Run:
