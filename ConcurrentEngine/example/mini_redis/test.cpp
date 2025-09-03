@@ -583,7 +583,7 @@ int main() {
 
 #endif
 
-#if 1 // with switching schedulers without DAG 
+#if 0 // with switching schedulers without DAG 
 #include <iostream>
 #include <vector>
 #include <string>
@@ -677,7 +677,7 @@ int main() {
 
 #endif
 
-#if 0 // DAG minimal example
+#if 1 // DAG minimal example
 #include <iostream>
 #include <threadPool/threadPool.hpp>
 #include <threadPool/scheduler/DAGschedule.hpp>
@@ -689,24 +689,27 @@ int main() {
 #include "CommandParser.hpp"
 
 
-int main() {
+int main() 
+{
     auto dagScheduler = std::make_unique<ConcurrentEngine::Scheduler::DAGScheduler>();
     ConcurrentEngine::ThreadPool pool(std::move(dagScheduler));
+    ThreadLogger::getInstance().enableConsoleLogging(false);
     pool.start(4);
 
     RedisServer redis(pool);
 
     Command setA{CommandType::SET, "key1", "hello"};
     Command setB{CommandType::SET, "key2", "world"};
-    Command getA{CommandType::GET, "key1"};
+    Command getA{CommandType::GET, "key1", "key2"};
 
     auto nodeA = redis.submitCommandDAG(setA); 
-    auto nodeB = redis.submitCommandDAG(setB);
+    auto nodeB = redis.submitCommandDAG(setB, {nodeA});
     auto nodeC = redis.submitCommandDAG(getA, {nodeA, nodeB}); // DAG依賴
 
     auto fut = redis.getResult(nodeC); // 外部才等待結果
-    std::cout << "GET result = " << fut.get() << "\n";
-
+    if(fut.valid())
+        std::cout << "GET result = " << fut.get() << "\n";
+    
     pool.stop();
 }
 
