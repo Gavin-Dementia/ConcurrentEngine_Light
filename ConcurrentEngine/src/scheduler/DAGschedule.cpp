@@ -29,35 +29,54 @@ void DAGScheduler::addTask(std::shared_ptr<TaskNode> node,
     }
 }
 
+Task DAGScheduler::popReadyTask()
+{
+    if (readyQueue_.empty())
+        return {}; // 空 queue 返回空 task
+
+    auto node = readyQueue_.front();
+    readyQueue_.pop();
+
+    return [this, node]() {
+        if (!node || !node->task) return;
+
+        try { node->task(); } 
+        catch (const std::exception& e) 
+        { 
+            LOG_ERROR(std::string("[DAGScheduler] Task exception: ") + e.what());  
+        }
+        catch (...)
+        {
+            LOG_ERROR("[DAGScheduler] Unknown exception in task!");
+        }
+
+        taskCompleted(node);
+    };
+}
+
 Task DAGScheduler::getTask()
 {
     std::unique_lock<std::mutex> lock(mutex_);
     cv_.wait(lock, [this] { return !readyQueue_.empty() || !running_; });
 
     // if (!running_ && readyQueue_.empty())  return {};
-    if (!running_ && readyQueue_.empty())  return nullptr;
+    if (!running_ && readyQueue_.empty())  return {};
 
-    
-    auto node = readyQueue_.front();
-    readyQueue_.pop();
+    return popReadyTask();
+}
 
-    if (!node || !node->task)
-    {
-        LOG_ERROR("[DAGScheduler] ERROR: null or empty task node in getTask()");
-        return nullptr;
-        // return {};
-    }
+Task DAGScheduler::getTaskFor(std::chrono::milliseconds timeout)
+{
+    std::unique_lock<std::mutex> lock(mutex_);
 
-    // 回傳一個包裝任務：執行實際任務後通知完成
-    return [this, node]() {
-        try 
-        {  node->task();  } 
-        catch (const std::exception& e) 
-        {  LOG_ERROR(std::string("[DAGScheduler] Exception in task: ") + e.what());  }
-        catch (...) 
-        {  LOG_ERROR("[DAGScheduler] Unknown exception in task!");  }
-        taskCompleted(node);
-    };
+    // 等待 readyQueue 有任務或 Scheduler 停止
+    if (!cv_.wait_for(lock, timeout, [this] { return !readyQueue_.empty() || !running_; }))
+        return {};
+
+    if (!running_ && readyQueue_.empty())
+        return {};
+
+    return popReadyTask();
 }
 
 void DAGScheduler::taskCompleted(std::shared_ptr<TaskNode> node)

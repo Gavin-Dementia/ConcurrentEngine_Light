@@ -74,6 +74,22 @@ Task FIFOScheduler::getTask()
     return task;
 }
 
+Task FIFOScheduler::getTaskFor(std::chrono::milliseconds timeout)
+{
+    std::unique_lock<std::mutex> lock(mutex_);
+    
+    if (!cv_.wait_for(lock, timeout, [this] { return !taskQueue_.empty() || !running_; }))
+    {  return {};  }
+
+    if (!running_ && taskQueue_.empty())
+        return {};
+
+    Task task = std::move(taskQueue_.front());
+    taskQueue_.pop();
+    cvFull_.notify_one();
+    return task;
+}
+
 void FIFOScheduler::reportStatus() 
 {
     std::lock_guard<std::mutex> lock(mutex_);

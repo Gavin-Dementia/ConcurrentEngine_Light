@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <cstddef>
+#include <chrono>
 
 namespace ConcurrentEngine::Scheduler 
 {
@@ -22,7 +23,11 @@ public:
     virtual ~IScheduler() = default;
 
     virtual void addTask(Task task) = 0;
+
     virtual Task getTask() = 0;
+    virtual Task getTaskFor(std::chrono::milliseconds)
+        {  return getTask();  }
+
     virtual void reportStatus() = 0;
     virtual void notifyAll() = 0;
     virtual void setRejectPolicy(RejectPolicy policy) = 0;

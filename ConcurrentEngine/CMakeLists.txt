@@ -17,7 +17,7 @@ add_library(ConcurrentEngineLib ${LIB_SOURCES})
 
 # === [ Example Executables ] ===
 function(add_example name)
-    add_executable(${name} examples/${name}.cpp)
+    add_executable(${name} example/${name}.cpp)
     target_link_libraries(${name} PRIVATE ConcurrentEngineLib)
 endfunction()
 

@@ -10,6 +10,7 @@
 #include <condition_variable>
 #include <iostream>
 #include <memory>
+#include <chrono>
 
 namespace ConcurrentEngine::Scheduler
 {
@@ -34,7 +35,10 @@ public:
     void addTask(std::shared_ptr<TaskNode> node,
                  const std::vector<std::shared_ptr<TaskNode>>& dependencies);
 
+    Task popReadyTask();
     Task getTask() override;
+    Task getTaskFor(std::chrono::milliseconds timeout) override;
+
     void reportStatus() override;
     void notifyAll() override;
 

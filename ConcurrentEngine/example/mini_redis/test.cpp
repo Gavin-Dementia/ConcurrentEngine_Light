@@ -677,7 +677,7 @@ int main() {
 
 #endif
 
-#if 1 // DAG minimal example
+#if 0 // DAG minimal example
 #include <iostream>
 #include <threadPool/threadPool.hpp>
 #include <threadPool/scheduler/DAGschedule.hpp>
@@ -713,6 +713,134 @@ int main()
     pool.stop();
 }
 
+
+#endif
+
+#if 1
+#include <iostream>
+#include <threadPool/threadPool.hpp>
+#include <threadPool/scheduler/FIFO_schedule.hpp>
+#include <threadPool/scheduler/PriorityScheduler.hpp>
+#include <threadPool/scheduler/DAGschedule.hpp>
+#include <future>
+#include <memory>
+#include "RedisServer.hpp"
+#include "CommandParser.hpp"
+
+// FIFO vs Priority
+void demo_scheduler() 
+{
+    std::cout << "\n===== [Demo 1] FIFO vs Priority Scheduler =====\n";
+
+    // FIFO
+    {
+        auto fifo = std::make_unique<ConcurrentEngine::Scheduler::FIFOScheduler>();
+        ConcurrentEngine::ThreadPool pool(std::move(fifo));
+        ThreadLogger::getInstance().enableConsoleLogging(false);
+        pool.start(2);
+
+        std::cout << "[FIFO] Submitting tasks A,B,C\n";
+        pool.submit("A", []{ std::this_thread::sleep_for(std::chrono::milliseconds(100)); std::cout << "Task A\n"; });
+        pool.submit("B", []{ std::cout << "Task B\n"; });
+        pool.submit("C", []{ std::cout << "Task C\n"; });
+
+        pool.stop();
+    }
+
+    // Priority
+    {
+        auto pri = std::make_unique<ConcurrentEngine::Scheduler::PriorityScheduler>();
+        ConcurrentEngine::ThreadPool pool(std::move(pri));
+        ThreadLogger::getInstance().enableConsoleLogging(false);
+        pool.start(2);
+
+        std::cout << "[Priority] Submitting tasks A(1),B(5),C(3)\n";
+        pool.submit("A", ConcurrentEngine::Scheduler::TaskPriority::HIGH, []{ std::cout << "Task A\n"; });
+        pool.submit("B", ConcurrentEngine::Scheduler::TaskPriority::LOW, []{ std::cout << "Task B\n"; });
+        pool.submit("C", ConcurrentEngine::Scheduler::TaskPriority::MEDIUM, []{ std::cout << "Task C\n"; });
+
+        pool.stop();
+    }
+}
+
+// mini-Redis basic instruction 
+void demo_redis_basic() 
+{
+    std::cout << "\n===== [Demo 2] mini-Redis basic function =====\n";
+
+    auto fifo = std::make_unique<ConcurrentEngine::Scheduler::FIFOScheduler>();
+    ConcurrentEngine::ThreadPool pool(std::move(fifo));
+    ThreadLogger::getInstance().enableConsoleLogging(false);
+
+    pool.start(2);
+
+    RedisServer redis(pool);
+
+    Command setA{CommandType::SET, "key1", "hello"};
+    Command setB{CommandType::SET, "key2", "world"};
+    Command getA{CommandType::GET, "key1"};
+    Command getB{CommandType::GET, "key2"};
+    Command existsB{CommandType::EXISTS, "key2"};
+    Command delA{CommandType::DEL, "key1"};
+    Command delB{CommandType::DEL, "key2"};
+
+    auto fut1 = redis.submitCommand(setA);
+    auto fut2 = redis.submitCommand(setB);
+    auto fut3 = redis.submitCommand(getA);
+    auto fut4 = redis.submitCommand(existsB);
+    auto fut5 = redis.submitCommand(delA);
+    auto fut6 = redis.submitCommand(getA);
+
+    std::cout << "SET key1 -> " << fut1.get() << "\n"; // OK
+    std::cout << "SET key2 -> " << fut2.get() << "\n"; // OK
+    std::cout << "GET key1 -> " << fut3.get() << "\n"; // hello
+    std::cout << "EXISTS key2 -> " << fut4.get() << "\n"; // 1
+    std::cout << "DEL key1 -> " << fut5.get() << "\n"; // (1)
+    std::cout << "GET key1 -> " << fut6.get() << "\n"; // (nil)
+
+    pool.stop();
+}
+
+// DAG -> Transaction
+void demo_redis_dag() 
+{
+    std::cout << "\n===== [Demo 3] Redis DAG Transaction =====\n";
+
+    auto dag = std::make_unique<ConcurrentEngine::Scheduler::DAGScheduler>();
+    ConcurrentEngine::ThreadPool pool(std::move(dag));
+    ThreadLogger::getInstance().enableConsoleLogging(false);
+    pool.start(4);
+
+    RedisServer redis(pool);
+
+    // SET A, SET B
+    Command setA{CommandType::SET, "key1", "hello"};
+    Command getA{CommandType::GET, "key1"};
+    Command setB{CommandType::SET, "key2", "world"};
+    Command getB{CommandType::GET, "key2"};
+
+    auto nodeA = redis.submitCommandDAG(setA); 
+    auto nodeB = redis.submitCommandDAG(setB, {nodeA});
+    auto nodeC = redis.submitCommandDAG(getA, {nodeA, nodeB});
+    auto nodeD = redis.submitCommandDAG(getB, {nodeA, nodeB, nodeC});
+
+    auto futC = redis.getResult(nodeC);
+    auto futD = redis.getResult(nodeD);
+
+    std::cout << "GET key1 (after DAG) -> " << futC.get() << "\n"; // hello
+    std::cout << "GET key2 (after DAG) -> " << futD.get() << "\n"; // world
+
+    pool.stop();
+}
+
+int main() 
+{
+    demo_scheduler();
+    demo_redis_basic();
+    demo_redis_dag();
+    std::cout << "\n===== Demo Finished =====\n";
+    return 0;
+}
 
 #endif
 

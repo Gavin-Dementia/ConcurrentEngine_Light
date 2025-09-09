@@ -36,7 +36,7 @@ std::future<std::string> RedisServer::submitCommand(const Command& cmd)
                 std::string key;
                 int existCount = 0;
                 while (iss >> key)
-                    if (db_.get(key) == "1") existCount++;
+                    if (db_.get(cmd.key) == db_.get(key) ) existCount++;
                 return "(" + std::to_string(existCount) + ")";
             }
 

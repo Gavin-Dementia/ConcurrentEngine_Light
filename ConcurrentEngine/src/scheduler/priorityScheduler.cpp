@@ -80,6 +80,30 @@ Task PriorityScheduler::getTask()
     return {};
 }
 
+Task PriorityScheduler::getTaskFor(std::chrono::milliseconds timeout)
+{
+    std::unique_lock<std::mutex> lock(mutex_);
+
+    if (!cv_.wait_for(lock, timeout, [this] { return totalQueueSize() > 0 || !running_; }))
+        return {}; // timeout
+
+    if (!running_ && totalQueueSize() == 0)
+        return {};
+
+    for (auto it = queues_.rbegin(); it != queues_.rend(); ++it)
+    {
+        if (!it->second.empty())
+        {
+            Task task = std::move(it->second.front());
+            it->second.pop();
+            cvFull_.notify_one();
+            return task;
+        }
+    }
+
+    return {}; // 防守性
+}
+
 void PriorityScheduler::reportStatus()
 {
     std::lock_guard<std::mutex> lock(mutex_);

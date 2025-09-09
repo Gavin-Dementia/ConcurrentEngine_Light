@@ -7,7 +7,7 @@
 #include <condition_variable>
 #include <map>
 #include <iostream>
-
+#include <chrono>
 namespace ConcurrentEngine::Scheduler 
 {
 
@@ -22,6 +22,8 @@ public:
     void addTask(Task task) override;
 
     Task getTask() override;
+    Task getTaskFor(std::chrono::milliseconds timeout) override;
+
     void reportStatus() override;
     void notifyAll() override;
     void setRejectPolicy(RejectPolicy policy) override;
