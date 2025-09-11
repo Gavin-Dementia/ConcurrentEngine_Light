@@ -379,7 +379,10 @@ StressResult stress_test_auto(ConcurrentEngine::ThreadPool& pool, int num_tasks)
 int main()
 {
     try {
-        vector<int> task_sizes = {1000, 5000, 10000, 50000, 100000}; //, 200000, 500000 
+        std::vector<int> task_sizes;
+        for (int n = 2500; n <= 100000; n += 2500) 
+            task_sizes.push_back(n);
+
         ofstream csvFile("stress_report.csv");
 
         if (!csvFile.is_open()) 
@@ -411,7 +414,7 @@ int main()
                     else 
                         pool.setScheduler(make_unique<ConcurrentEngine::Scheduler::PriorityScheduler>());
 
-                    pool.start(8);
+                    pool.start(512);
                     auto result = stress_test_auto(pool, num_tasks);
                     pool.stop();// stop pool after all futures have completed
 
